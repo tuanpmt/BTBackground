@@ -30,7 +30,7 @@
     self.central=[[CBCentralManager alloc] initWithDelegate:self queue:dispatch_get_global_queue(QOS_CLASS_BACKGROUND, 0)];
     self.discoveredPeripherals=[NSMutableArray new];
 
-    self.deviceInfoUUID=[CBUUID UUIDWithString:@"0x180A"];
+    self.deviceInfoUUID=[CBUUID UUIDWithString:@"0x00FF"];
     
 }
 
@@ -98,7 +98,7 @@
 
 
 -(void) centralManager:(CBCentralManager *)central didDiscoverPeripheral:(CBPeripheral *)peripheral advertisementData:(NSDictionary *)advertisementData RSSI:(NSNumber *)RSSI {
-    NSLog(@"Discovered peripheral %@ (%@)",peripheral.name,peripheral.identifier.UUIDString);
+//    NSLog(@"Discovered peripheral %@ (%@)",peripheral.name,peripheral.identifier.UUIDString);
     if (![self.discoveredPeripherals containsObject:peripheral] ) {
         dispatch_async(dispatch_get_main_queue(), ^{
             [self.discoveredPeripherals addObject:peripheral];
@@ -146,28 +146,46 @@
         }
     }
 }
-
+- (void)peripheral:(CBPeripheral *)peripheral
+didUpdateNotificationStateForCharacteristic:(CBCharacteristic *)characteristic
+             error:(NSError *)error {
+    
+    if (error) {
+        NSLog(@"Error changing notification state: %@",
+              [error localizedDescription]);
+    }
+    NSLog(@"Update");
+}
 -(void) peripheral:(CBPeripheral *)peripheral didDiscoverCharacteristicsForService:(CBService *)service error:(NSError *)error {
     for (CBCharacteristic *characteristic in service.characteristics ) {
-        NSLog(@"Discovered characteristic %@(%@)",characteristic.description,characteristic.UUID.UUIDString);
-        if ([characteristic.UUID.UUIDString isEqualToString:@"2A29"]) {
-            [peripheral readValueForCharacteristic:characteristic];
+        [peripheral setNotifyValue:YES forCharacteristic:characteristic];
+        NSLog(@"Discovered characteristic %@(%@)", characteristic.description, characteristic.UUID.UUIDString);
+        if ([characteristic.UUID.UUIDString isEqualToString:@"FF01"]) {
+            NSLog(@"setNotifyValue:YES %@", characteristic.UUID.UUIDString);
+            
+//            [peripheral readValueForCharacteristic:characteristic];
         }
     }
 }
 
 -(void) peripheral:(CBPeripheral *)peripheral didUpdateValueForCharacteristic:(CBCharacteristic *)characteristic error:(NSError *)error {
-    NSString *manf=[[NSString alloc] initWithData:characteristic.value encoding:NSUTF8StringEncoding];
-    dispatch_async(dispatch_get_main_queue(), ^{
-        self.manfLabel.text=manf;
-    });
+    if (error) {
+        NSLog(@"Error reading characteristics: %@", [error localizedDescription]);
+        return;
+    }
+    
+//    NSString *manf=[[NSString alloc] initWithData:characteristic.value encoding:NSUTF8StringEncoding];
+    NSLog(@"Update reading characteristics: %@", characteristic.value);
+//    dispatch_async(dispatch_get_main_queue(), ^{
+//        self.manfLabel.text=manf;
+//    });
     UIApplication *app=[UIApplication sharedApplication];
     if (app.applicationState == UIApplicationStateBackground) {
         NSLog(@"We are in the background");
         UIUserNotificationSettings *notifySettings=[[UIApplication sharedApplication] currentUserNotificationSettings];
         if ((notifySettings.types & UIUserNotificationTypeAlert)!=0) {
             UILocalNotification *notification=[UILocalNotification new];
-            notification.alertBody=[NSString stringWithFormat:@"Connected to peripheral from %@",manf];
+            notification.alertBody=[NSString stringWithFormat:@"Connected to peripheral from %@",characteristic.value];
             [app presentLocalNotificationNow:notification];
         }
     }
